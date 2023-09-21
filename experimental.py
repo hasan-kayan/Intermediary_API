@@ -4,13 +4,13 @@ import json
 import os
 
 # AWS S3 configuration
-s3_bucket_name = 'wait-list-db'  # Replace with your S3 bucket name
+s3_bucket_name = 'your-s3-bucket-name'  # Replace with your S3 bucket name
 
 # Initialize the AWS S3 client
 s3_client = boto3.client('s3')
 
 # Read the user data from the CSV file
-csv_file_path = './data/user.csv'  # Replace with the path to your CSV file
+csv_file_path = 'user_data.csv'  # Replace with the path to your CSV file
 user_data_df = pd.read_csv(csv_file_path)
 
 # Create a directory to store JSON files
