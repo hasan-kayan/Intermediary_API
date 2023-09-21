@@ -1,42 +1,44 @@
-import boto3
-import pandas as pd
-import json
 import os
+import boto3
+from flask import Flask, request, jsonify
+import json
 
-# AWS S3 configuration
-s3_bucket_name = 'wait-list-db'  # Replace with your S3 bucket name
+# AWS kimlik bilgilerini tanımlayın
+AWS_ACCESS_KEY_ID = 'Your-Access-Key-ID'
+AWS_SECRET_ACCESS_KEY = 'Your-Secret-Access-Key'
+AWS_REGION = 'Your-Region'
 
-# Initialize the AWS S3 client
-s3_client = boto3.client('s3')
+# S3 bucket adını belirtin
+S3_BUCKET_NAME = 'Your-S3-Bucket-Name'
 
-# Read the user data from the CSV file
-csv_file_path = './data/user.csv'  # Replace with the path to your CSV file
-user_data_df = pd.read_csv(csv_file_path)
+# Flask uygulamasını oluşturun
+app = Flask(__name__)
 
-# Create a directory to store JSON files
-json_dir = 'user_json_data'
-os.makedirs(json_dir, exist_ok=True)
+# AWS S3 istemcisini oluşturun
+s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY, region_name=AWS_REGION)
 
-# Iterate through each row of the CSV data and save as JSON
-for index, row in user_data_df.iterrows():
-    user_data = {
-        'Name': row['Name'],
-        'Surname': row['Surname'],
-        'Email': row['Email']
-    }
+# Kullanıcı loglarını saklamak için bir dizin oluşturun
+LOG_DIRECTORY = 'logs'
+if not os.path.exists(LOG_DIRECTORY):
+    os.makedirs(LOG_DIRECTORY)
 
-    # Generate a unique JSON file name based on the user's name
-    json_file_name = f'{row["Name"]}_{row["Surname"]}.json'
+# POST isteği işleme
+@app.route('/process', methods=['POST'])
+def process_data():
+    try:
+        data = request.json  # Gelen veriyi alın (JSON formatında)
+        
+        # Gelen veriyi S3 bucket'a kaydetme
+        s3.put_object(Bucket=S3_BUCKET_NAME, Key=f'data/{data["user_id"]}.json', Body=json.dumps(data))
+        
+        # Kullanıcı logunu oluşturma
+        log_file = os.path.join(LOG_DIRECTORY, f'{data["user_id"]}_log.txt')
+        with open(log_file, 'a') as file:
+            file.write(f'User ID: {data["user_id"]}, Data: {data}\n')
+        
+        return jsonify({'message': 'Data processed successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-    # Save the user data as JSON
-    with open(os.path.join(json_dir, json_file_name), 'w') as json_file:
-        json.dump(user_data, json_file)
-
-    # Upload the JSON file to S3
-    s3_client.upload_file(
-        os.path.join(json_dir, json_file_name),
-        s3_bucket_name,
-        f'user_data/{json_file_name}'  # Specify the S3 path where JSON files will be stored
-    )
-
-print(f'All user data JSON files uploaded to {s3_bucket_name}/user_data/')
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=80)

@@ -1,42 +1,29 @@
-import boto3
-import pandas as pd
+import csv
 import json
-import os
+import boto3
 
-# AWS S3 configuration
-s3_bucket_name = 'your-s3-bucket-name'  # Replace with your S3 bucket name
+# AWS kimlik bilgilerini tanımlayın
+AWS_ACCESS_KEY_ID = 'Your-Access-Key-ID'
+AWS_SECRET_ACCESS_KEY = 'Your-Secret-Access-Key'
+AWS_REGION = 'Your-Region'
 
-# Initialize the AWS S3 client
-s3_client = boto3.client('s3')
+# S3 bucket adını belirtin
+S3_BUCKET_NAME = 'Your-S3-Bucket-Name'
 
-# Read the user data from the CSV file
-csv_file_path = 'user_data.csv'  # Replace with the path to your CSV file
-user_data_df = pd.read_csv(csv_file_path)
+# CSV dosyasının adı ve yolu
+CSV_FILE_PATH = 'user.csv'
 
-# Create a directory to store JSON files
-json_dir = 'user_json_data'
-os.makedirs(json_dir, exist_ok=True)
+# AWS S3 istemcisini oluşturun
+s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY, region_name=AWS_REGION)
 
-# Iterate through each row of the CSV data and save as JSON
-for index, row in user_data_df.iterrows():
-    user_data = {
-        'Name': row['Name'],
-        'Surname': row['Surname'],
-        'Email': row['Email']
-    }
+# CSV dosyasını açın ve her bir satırı işleyin
+with open(CSV_FILE_PATH, 'r') as csv_file:
+    csv_reader = csv.DictReader(csv_file)
+    for row in csv_reader:
+        # Her bir kullanıcıyı JSON formatına dönüştürün
+        user_json = json.dumps(row)
+        
+        # JSON verisini S3 bucket'a yükleyin
+        s3.put_object(Bucket=S3_BUCKET_NAME, Key=f'users/{row["user_id"]}.json', Body=user_json)
 
-    # Generate a unique JSON file name based on the user's name
-    json_file_name = f'{row["Name"]}_{row["Surname"]}.json'
-
-    # Save the user data as JSON
-    with open(os.path.join(json_dir, json_file_name), 'w') as json_file:
-        json.dump(user_data, json_file)
-
-    # Upload the JSON file to S3
-    s3_client.upload_file(
-        os.path.join(json_dir, json_file_name),
-        s3_bucket_name,
-        f'user_data/{json_file_name}'  # Specify the S3 path where JSON files will be stored
-    )
-
-print(f'All user data JSON files uploaded to {s3_bucket_name}/user_data/')
+print("CSV verileri JSON formatında S3 bucket'a yüklendi.")
